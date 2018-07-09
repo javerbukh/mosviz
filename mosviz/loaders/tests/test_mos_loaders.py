@@ -81,6 +81,8 @@ def test_mosviz_basic(qtbot, mosviz_gui):
 
     left_click(qtbot, widget.button_ok)
 
+    mosviz_gui.add_data_con(d)
+
 
 
 
