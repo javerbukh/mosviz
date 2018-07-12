@@ -38,7 +38,7 @@ except ImportError:
 
 from ..widgets.toolbars import MOSViewerToolbar
 from ..widgets.plots import Line1DWidget, MOSImageWidget, DrawableImageWidget
-from ..loaders.loader_selection import confirm_loaders_and_column_names
+from ..loaders.loader_selection import confirm_loaders_and_column_names, LoaderSelectionDialog
 from ..loaders.utils import SPECTRUM1D_LOADERS, SPECTRUM2D_LOADERS, CUTOUT_LOADERS
 from ..widgets.viewer_options import OptionsWidget
 from ..widgets.share_axis import SharedAxisHelper
@@ -65,6 +65,7 @@ class MOSVizViewer(DataViewer):
         self.comments = False
         self.textChangedAt = None
         self.mask = None
+        self.result_loader = None
 
         self.catalog = None
         self.current_row = None
@@ -146,6 +147,8 @@ class MOSVizViewer(DataViewer):
         """
         Connects gui elements to event calls.
         """
+        print("Catalog: ", self.catalog)
+        print("Toolbar: ", self.toolbar.source_select.count())
         # Connect the selection event for the combo box to what's displayed
         self.toolbar.source_select.currentIndexChanged[int].connect(
             lambda ind: self.load_selection(self.catalog[ind]))
@@ -237,7 +240,7 @@ class MOSVizViewer(DataViewer):
         # Check whether the data is suitable for the MOSViz viewer - basically
         # we expect a table of 1D columns with at least three string and four
         # floating-point columns.
-
+        print("data.ndim in mos_viewer.py", data.ndim)
         if data.ndim != 1:
             QMessageBox.critical(self, "Error", "MOSViz viewer can only be used "
                                  "for data with 1-dimensional components",
@@ -245,14 +248,17 @@ class MOSVizViewer(DataViewer):
             return False
 
         components = [data.get_component(cid) for cid in data.visible_components]
-
+        print("component in mos_viewer.py", data.visible_components)
+        print("components", components)
         categorical = [c for c in components if c.categorical]
+        print("got here", categorical)
         if len(categorical) < 3:
             QMessageBox.critical(self, "Error", "MOSViz viewer expected at least "
                                  "three string components/columns, representing "
                                  "the filenames of the 1D and 2D spectra and "
                                  "cutouts", buttons=QMessageBox.Ok)
             return False
+        print("categorical in mos_viewer.py", categorical)
 
         # We can relax the following requirement if we make the slit parameters
         # optional
@@ -263,7 +269,12 @@ class MOSVizViewer(DataViewer):
                                  "the slit position, length, and position angle",
                                  buttons=QMessageBox.Ok)
             return False
+        print("numerical in mos_viewer.py", numerical)
 
+        # result = None
+        # if not data.meta.get('loaders_confirmed', False):
+        #     self.result_loader = LoaderSelectionDialog(data=data)
+        #     return self.result_loader
         # Make sure the loaders and column names are correct
         result = confirm_loaders_and_column_names(data)
         if not result:
@@ -272,6 +283,80 @@ class MOSVizViewer(DataViewer):
         self._primary_data = data
         self._layer_view.data = data
         self._unpack_selection(data)
+        return True
+
+    def add_data_for_testing(self, data):
+        """
+        Processes data message from the central communication hub.
+
+        Parameters
+        ----------
+        data : :class:`glue.core.data.Data`
+            Data object.
+        """
+
+        # Check whether the data is suitable for the MOSViz viewer - basically
+        # we expect a table of 1D columns with at least three string and four
+        # floating-point columns.
+        print("data.ndim in mos_viewer.py", data.ndim)
+        if data.ndim != 1:
+            QMessageBox.critical(self, "Error", "MOSViz viewer can only be used "
+                                 "for data with 1-dimensional components",
+                                 buttons=QMessageBox.Ok)
+            return False
+
+        components = [data.get_component(cid) for cid in data.visible_components]
+        print("component in mos_viewer.py", data.visible_components)
+        print("components", components)
+        categorical = [c for c in components if c.categorical]
+        print("got here", categorical)
+        if len(categorical) < 3:
+            QMessageBox.critical(self, "Error", "MOSViz viewer expected at least "
+                                 "three string components/columns, representing "
+                                 "the filenames of the 1D and 2D spectra and "
+                                 "cutouts", buttons=QMessageBox.Ok)
+            return False
+        print("categorical in mos_viewer.py", categorical)
+
+        # We can relax the following requirement if we make the slit parameters
+        # optional
+        numerical = [c for c in components if c.numeric]
+        if len(numerical) < 4:
+            QMessageBox.critical(self, "Error", "MOSViz viewer expected at least "
+                                 "four numerical components/columns, representing "
+                                 "the slit position, length, and position angle",
+                                 buttons=QMessageBox.Ok)
+            return False
+        print("numerical in mos_viewer.py", numerical)
+
+        #########################################################
+        if 'loaders' not in data.meta:
+            data.meta['loaders'] = {}
+
+        data.meta['loaders']['spectrum1d'] = "Pre NIRSpec 1D Spectrum"
+        data.meta['loaders']['spectrum2d'] = "Pre NIRSpec 2D Spectrum"
+        data.meta['loaders']['cutout'] = "ACS Cutout Image"
+
+        if 'special_columns' not in data.meta:
+            data.meta['special_columns'] = {}
+
+        data.meta['special_columns']['spectrum1d'] = 'spectrum1d'
+        data.meta['special_columns']['spectrum2d'] = 'spectrum2d'
+        data.meta['special_columns']['cutout'] = 'cutout'
+        data.meta['special_columns']['slit_ra'] = 'ra'
+        data.meta['special_columns']['slit_dec'] = 'dec'
+        data.meta['special_columns']['slit_width'] = 'slit_width'
+        data.meta['special_columns']['slit_length'] = 'slit_length'
+
+        data.meta['loaders_confirmed'] = True
+
+        print("Data: ", data)
+        print("Data.meta", data.meta)
+        #########################################################
+
+        self._primary_data = data
+        self._layer_view.data = data
+        # self._unpack_selection(data)
         return True
 
     def add_subset(self, subset):
@@ -350,7 +435,7 @@ class MOSVizViewer(DataViewer):
             Glue data object to decompose.
 
         """
-
+        print("in unpack selection")
         mask = None
 
         if isinstance(data, Subset):
