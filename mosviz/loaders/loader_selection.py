@@ -68,6 +68,10 @@ class LoaderSelectionDialog(QtWidgets.QDialog, HasCallbackProperties):
 
             loaders = data.meta['loaders']
 
+            print("loaders: ", loaders)
+            print("SPEc1D: ", SPECTRUM1D_LOADERS)
+            print("Spec2D: ", SPECTRUM2D_LOADERS)
+
             if "spectrum1d" in loaders and loaders['spectrum1d'] in SPECTRUM1D_LOADERS:
                 self.loader_spectrum1d = loaders['spectrum1d']
             if "spectrum2d" in loaders and loaders['spectrum2d'] in SPECTRUM2D_LOADERS:
@@ -98,6 +102,8 @@ class LoaderSelectionDialog(QtWidgets.QDialog, HasCallbackProperties):
             # Store components that appear in the combo inside the column object
             column['components'] = dict((x.label, x) for x in getattr(LoaderSelectionDialog, column['property']).get_choices(self))
 
+        print("Helper column: ", self._helpers)
+
         # We check whether any of the properties are already defined in the
         # Data.meta dictionary. This could happen for example if the user has
         # encoded some of these defaults in their data file (which we
@@ -117,16 +123,37 @@ class LoaderSelectionDialog(QtWidgets.QDialog, HasCallbackProperties):
         # sophisticated auto-testing.
 
         for column in self.columns:
+            print()
+            print("column: ", column)
+            print("default: ", column['default'], column['property'], getattr(self, column['property']))
+            try:
+                print("attr default: ", getattr(self, column['default']))
+            except Exception as e:
+                print("no attr as default")
+                pass
             if not column['components']:
                 continue
-            if getattr(self, column['property']) is None:
+
+            if getattr(self, column['property']) is not None:
                 if column['default'] in column['components']:
-                    setattr(self, column['property'], column['default'])
+                    print('Default check: ', column['default'], column['components'])
+                    try:
+                        setattr(self, column['property'], column['components'][column['default']])
+                    except Exception as e:
+                        print("couldnt set default")
+                        setattr(self, column['property'], sorted(column['components'])[0])
+
                 else:
+                    print('Default check (else): ',column['default'], column['components'])
                     setattr(self, column['property'], sorted(column['components'])[0])
+            else:
+                print(getattr(self, column['property']))
 
         # The following is a call to a function that deals with setting up the
         # linking between the callback properties here and the Qt widgets.
+
+        print("UI: \n {}".format(self.ui))
+        print("columns: ", self.columns)
 
         autoconnect_callbacks_to_qt(self, self.ui)
 

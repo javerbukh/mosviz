@@ -268,6 +268,8 @@ class MOSVizViewer(DataViewer):
             return False
 
         # Make sure the loaders and column names are correct
+        print(data.meta)
+        print(dir(data.meta))
         result = confirm_loaders_and_column_names(data)
         if not result:
             return False
